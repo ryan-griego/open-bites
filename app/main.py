@@ -1,8 +1,23 @@
 from fastapi import FastAPI, HTTPException
 from datetime import datetime
 from app.data_handler import load_data
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+
 
 app = FastAPI()
+
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 restaurants_data = load_data()  # parse CSV once at startup
 
 @app.get("/open_restaurants/")
