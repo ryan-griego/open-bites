@@ -8,8 +8,8 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
-app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
-
+# app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
 
 app.add_middleware(
     CORSMiddleware,
