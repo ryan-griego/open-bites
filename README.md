@@ -30,8 +30,8 @@ This application provides a FastAPI-based backend that parses a CSV of restauran
 ### Cloning the Repository
 
 ```bash
-git clone https://github.com/your-username/open-restaurants-finder.git
-cd open-restaurants-finder
+git clone https://github.com/ryan-griego/open-bites.git
+cd open-bites
 ```
 
 ### Installing Dependencies and Running Locally
