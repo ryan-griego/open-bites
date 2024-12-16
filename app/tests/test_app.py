@@ -1,100 +1,122 @@
+# test_app.py
+
 import pytest
-from app.data_handler import parse_time_string, parse_hours
+from app.data_handler import parse_time_string, parse_hours, load_data
 from datetime import time
 
 def test_parse_time_string():
+    # Valid time strings
     assert parse_time_string("1:30 pm") == time(13, 30), "1:30 pm should convert to 13:30"
     assert parse_time_string("9:00 am") == time(9, 0), "9:00 am should convert to 09:00"
-    # Checks for an invalid hour in the restauraunt times
-    with pytest.raises(ValueError):
-        parse_time_string("25 am")
-
-    # Times around noon and midnight to make sure they parse correctly
     assert parse_time_string("12 pm") == time(12, 0), "12 pm is noon"
     assert parse_time_string("12 am") == time(0, 0), "12 am is midnight"
-
-    # Time without minutes specified:
     assert parse_time_string("9 pm") == time(21, 0), "9 pm with no minutes should default to :00"
 
-def test_parse_hours():
-    # A simple example from the original test
-    hours_str = "Mon-Sun 11:00 am - 10 pm"
+    # Invalid time strings
+    with pytest.raises(ValueError):
+        parse_time_string("25 am")
+    with pytest.raises(ValueError):
+        parse_time_string("13:60 pm")
+    with pytest.raises(ValueError):
+        parse_time_string("invalid time")
+
+def test_parse_hours_single_day():
+    # Single day, no range
+    hours_str = "Mon 11 am - 10 pm"
     schedule = parse_hours(hours_str)
     assert len(schedule["mon"]) == 1, "Mon should have one time range"
     start, end = schedule["mon"][0]
-    # Check start and end times
-    assert start == time(11,0), "Start should be 11:00"
-    assert end == time(22,0), "End should be 22:00 (10 pm)"
+    assert start == time(11, 0), "Start should be 11:00"
+    assert end == time(22, 0), "End should be 22:00 (10 pm)"
 
-def test_parse_hours_multiple_segments():
-    # Isn't in the CSV but represents a possibility in the way the times are entered into the csv
-    # Mon-Thu, Sun 11 am - 9 pm  / Fri-Sat 5 pm - 1 am
-      # Means:
-      #   Mon-Thu: 11:00-21:00
-      #   Sun: 11:00-21:00
-      #   Fri-Sat: 17:00-01:00 - includes next day
-    hours_str = "Mon-Thu, Sun 11 am - 9 pm / Fri-Sat 5 pm - 1 am"
+    # Days not listed should have no hours
+    assert len(schedule["tue"]) == 0, "Tue should have no hours"
+
+def test_parse_hours_day_aliases():
+    # Using different day name abbreviations
+    hours_str = "Tues-Fri, Sunday 11 am - 10 pm / Sat 5 pm - 11 pm"
     schedule = parse_hours(hours_str)
 
-    # Checking 2 weekdays Monday and Tuesday
-    mon_range = schedule["mon"][0]
-    tue_range = schedule["tue"][0]
-    assert mon_range == (time(11,0), time(21,0)), "Mon should be 11am-9pm"
-    assert tue_range == (time(11,0), time(21,0)), "Tue should be 11am-9pm"
+    # Check Tuesday
+    assert len(schedule["tue"]) == 1, "Tue should have one time range"
+    assert schedule["tue"][0] == (time(11, 0), time(22, 0)), "Tue time range incorrect"
 
-    # Checking that Sunday is separately listed
-    sun_range = schedule["sun"][0]
-    assert sun_range == (time(11,0), time(21,0)), "Sun should be 11am-9pm"
+    # Check Friday
+    assert len(schedule["fri"]) == 1, "Fri should have one time range"
+    assert schedule["fri"][0] == (time(11, 0), time(22, 0)), "Fri time range incorrect"
 
-    # Check Friday with overnight hours
+    # Check Sunday
+    assert len(schedule["sun"]) == 1, "Sun should have one time range"
+    assert schedule["sun"][0] == (time(11, 0), time(22, 0)), "Sun time range incorrect"
 
+    # Check Saturday
+    assert len(schedule["sat"]) == 1, "Sat should have one time range"
+    assert schedule["sat"][0] == (time(17, 0), time(23, 0)), "Sat time range incorrect"
 
-    fri_ranges = schedule["fri"]
-    # Check Friday's interval first:
-    assert any(r[0] == time(17,0) for r in fri_ranges), "Fri should start at 5 pm"
-
-    sat_ranges = schedule["sat"]
-    # Check if Sat has an early morning interval
-    assert any(r[1] == time(1,0) for r in sat_ranges), "Sat should have an interval ending at 1 am"
-
-def test_parse_hours_single_day_overnight():
-    # Test a single day with overnight hours:
-    # Fri 10 pm - 1 am
-    # This means it starts at 22:00 on Friday and ends at 01:00 on Saturday.
+def test_parse_hours_overlapping_ranges():
+    # Overlapping and overnight ranges
     hours_str = "Fri 10 pm - 1 am"
     schedule = parse_hours(hours_str)
 
-    fri_ranges = schedule["fri"]
-    # Expect Friday interval to end at midnight
-    assert any(r[0] == time(22,0) for r in fri_ranges), "Friday should start at 10 pm"
-    # Saturday should have a range including the early hour of 1 am
-    sat_ranges = schedule["sat"]
-    assert any(r[1] == time(1,0) for r in sat_ranges), "Saturday should have interval ending at 1 am"
+    # Friday should have 10 pm - 23:59
+    assert len(schedule["fri"]) == 1, "Fri should have one time range"
+    assert schedule["fri"][0] == (time(22, 0), time(23, 59)), "Fri time range incorrect"
 
-def test_parse_hours_missing_day():
-    # Suppose a restaurant is only open Mon, Wed, Fri and no other days listed
-      # This means Tue, Thu, Sat, Sun are closed.
-    hours_str = "Mon 11 am - 2 pm / Wed 11 am - 2 pm / Fri 11 am - 2 pm"
+    # Saturday should have 00:00 - 01:00
+    assert len(schedule["sat"]) == 1, "Sat should have one time range"
+    assert schedule["sat"][0] == (time(0, 0), time(1, 0)), "Sat time range incorrect"
+
+def test_parse_hours_missing_time():
+    # Missing time part
+    hours_str = "Mon-Fri"
     schedule = parse_hours(hours_str)
+    for day in ["mon", "tue", "wed", "thu", "fri"]:
+        assert len(schedule[day]) == 0, f"{day} should have no time ranges"
 
-    # Check Monday:
-    assert len(schedule["mon"]) == 1, "Mon should have one interval"
-    # Check a day that is not specifie - Tuesday
-    # Tuesday should be empty or have no intervals
-    assert len(schedule["tue"]) == 0, "Tue should be closed"
+def test_load_data():
+    # Assuming 'data/restaurants.csv' exists and is correctly formatted
+    restaurants = load_data("data/restaurants.csv")
+    assert isinstance(restaurants, dict), "Restaurants should be a dictionary"
+    for name, schedule in restaurants.items():
+        assert isinstance(schedule, dict), f"Schedule for '{name}' should be a dictionary"
+        for day, times in schedule.items():
+            assert isinstance(times, list), f"Times for '{day}' in '{name}' should be a list"
+            for start, end in times:
+                assert isinstance(start, time), "Start time should be a datetime.time object"
+                assert isinstance(end, time), "End time should be a datetime.time object"
 
 def test_parse_hours_non_sequential_days():
     # Non-sequential days: "Mon, Wed, Fri 11 am - 2 pm"
-    # This tests that comma-separated non-range days are handled correctly.
     hours_str = "Mon, Wed, Fri 11 am - 2 pm"
     schedule = parse_hours(hours_str)
 
     # Check Monday
-    assert schedule["mon"] == [(time(11,0), time(14,0))], "Mon should have 11am-2pm"
+    assert schedule["mon"] == [(time(11, 0), time(14, 0))], "Mon should have 11am-2pm"
     # Check Wednesday
-    assert schedule["wed"] == [(time(11,0), time(14,0))], "Wed should have 11am-2pm"
+    assert schedule["wed"] == [(time(11, 0), time(14, 0))], "Wed should have 11am-2pm"
     # Check Friday
-    assert schedule["fri"] == [(time(11,0), time(14,0))], "Fri should have 11am-2pm"
+    assert schedule["fri"] == [(time(11, 0), time(14, 0))], "Fri should have 11am-2pm"
 
-    # Check a day not listed:
-    assert schedule["tue"] == [], "Tue should be closed and not have any hours"
+    # Check a day not listed
+    assert schedule["tue"] == [], "Tue should be closed and have no hours"
+
+def test_parse_hours_multiple_aliases():
+    # Using multiple aliases for days
+    hours_str = "Tues-Thurs, Sunday 10 am - 8 pm / Sat 5 pm - 11 pm"
+    schedule = parse_hours(hours_str)
+
+    # Check Tuesday
+    assert len(schedule["tue"]) == 1, "Tue should have one time range"
+    assert schedule["tue"][0] == (time(10, 0), time(20, 0)), "Tue time range incorrect"
+
+    # Check Thursday
+    assert len(schedule["thu"]) == 1, "Thu should have one time range"
+    assert schedule["thu"][0] == (time(10, 0), time(20, 0)), "Thu time range incorrect"
+
+    # Check Sunday
+    assert len(schedule["sun"]) == 1, "Sun should have one time range"
+    assert schedule["sun"][0] == (time(10, 0), time(20, 0)), "Sun time range incorrect"
+
+    # Check Saturday
+    assert len(schedule["sat"]) == 1, "Sat should have one time range"
+    assert schedule["sat"][0] == (time(17, 0), time(23, 0)), "Sat time range incorrect"

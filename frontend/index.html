@@ -6,9 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Open Restaurants Finder</title>
 
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
   <style>
     body {
@@ -17,9 +18,12 @@
       padding: 0;
       color: #333;
       background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
-        url('https://images.unsplash.com/photo-1516684669134-de6f4e55aa30?auto=format&fit=crop&w=1950&q=80') no-repeat center center fixed;
+        url('https://res.cloudinary.com/dm7y3yvjp/image/upload/v1734325100/open-bites-bg_gaumlc.jpg') no-repeat center center fixed;
       background-size: cover;
       animation: fadeInBackground 1.5s ease-in-out;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
 
     @keyframes fadeInBackground {
@@ -54,6 +58,8 @@
     .hero h1 {
       font-size: 3rem;
       margin-bottom: 20px;
+      line-height: 1.2;
+      letter-spacing: -1px;
     }
 
     .hero p {
@@ -65,12 +71,11 @@
 
     .container {
       max-width: 900px;
-      margin: 0 auto;
+      margin: -60px auto 60px auto;
       background: #fff;
       padding: 40px;
       border-radius: 8px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-      margin-top: -60px;
       position: relative;
       z-index: 2;
       opacity: 0;
@@ -85,6 +90,7 @@
 
     p {
       margin-bottom: 20px;
+      line-height: 1.6;
     }
 
     label {
@@ -93,7 +99,7 @@
       font-weight: 600;
     }
 
-    input[type="datetime-local"] {
+    input[type="text"] {
       margin-bottom: 12px;
       padding: 8px;
       width: 100%;
@@ -101,6 +107,12 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       font-size: 16px;
+      outline: none;
+      transition: border 0.2s ease;
+    }
+
+    input[type="text"]:focus {
+      border-color: #0066cc;
     }
 
     button {
@@ -114,6 +126,7 @@
       font-size: 16px;
       transition: background 0.3s ease, transform 0.2s;
       margin-right: 10px;
+      outline: none;
     }
 
     button:hover {
@@ -128,36 +141,6 @@
 
     .reset-btn:hover {
       background: #aaa;
-    }
-
-    table {
-      border-collapse: collapse;
-      margin-top: 20px;
-      width: 100%;
-      border-radius: 4px;
-      overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-      opacity: 0;
-      animation: fadeInTable 0.8s ease-in-out forwards;
-    }
-
-    @keyframes fadeInTable {
-      to {
-        opacity: 1;
-      }
-    }
-
-    th,
-    td {
-      border-bottom: 1px solid #ccc;
-      padding: 12px;
-      text-align: left;
-      font-size: 16px;
-    }
-
-    th {
-      background-color: #f7f7f7;
-      font-weight: 600;
     }
 
     #no-results {
@@ -179,6 +162,41 @@
       }
     }
 
+    /* Results Grid */
+    #resultsContainer {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+      margin-top: 20px;
+      opacity: 0;
+      animation: fadeInResults 0.8s ease-in-out forwards;
+    }
+
+    @keyframes fadeInResults {
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* If more than 10, show two columns */
+    #resultsContainer.two-columns {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .restaurant-card {
+      background: #f9f9f9;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      font-size: 16px;
+      font-weight: 500;
+      transition: transform 0.2s;
+    }
+
+    .restaurant-card:hover {
+      transform: scale(1.02);
+    }
+
     @media (max-width: 600px) {
       .hero h1 {
         font-size: 2rem;
@@ -192,48 +210,53 @@
         margin-top: -40px;
         padding: 20px;
       }
+
+      #resultsContainer.two-columns {
+        grid-template-columns: 1fr;
+        /* On small screens, revert to single column */
+      }
     }
   </style>
 </head>
 
 <body>
 
-  <div class="hero">
+  <header class="hero">
     <h1>Discover Who's Open Now</h1>
     <p>Plan your next meal with confidence. Enter a date and time to instantly see which restaurants are ready to serve
       you.</p>
-  </div>
+  </header>
 
-  <div class="container">
-    <p>Select a date and time to see which restaurants are open.</p>
+  <main class="container">
+    <p>Pick a date and time below to find open restaurants:</p>
     <label for="datetimeInput">Choose a date and time:</label>
-    <input type="datetime-local" id="datetimeInput" />
+    <input type="text" id="datetimeInput" placeholder="Select Date & Time" />
 
-    <button onclick="checkOpenRestaurants()">Check</button>
+    <button onclick="checkOpenRestaurants()" style="background-color:teal">Check</button>
     <button class="reset-btn" onclick="resetFields()">Reset</button>
 
     <div id="no-results">No restaurants are open at that time. Please try again.</div>
-    <table id="resultsTable">
-      <thead>
-        <tr>
-          <th>Restaurant Name</th>
-        </tr>
-      </thead>
-      <tbody id="resultsBody"></tbody>
-    </table>
-  </div>
+    <div id="resultsContainer"></div>
+  </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script>
-    async function checkOpenRestaurants() {
-      const dt = document.getElementById('datetimeInput').value;
-      const noResultsDiv = document.getElementById('no-results');
-      const resultsTable = document.getElementById('resultsTable');
-      const resultsBody = document.getElementById('resultsBody');
+    const fp = flatpickr("#datetimeInput", {
+      enableTime: true,
+      altInput: true,
+      altFormat: "F j, Y h:i K",
+      dateFormat: "Y-m-d\\TH:i",
+    });
 
-      // Clear previous results
+    async function checkOpenRestaurants() {
+      const dt = fp.input.value;
+      const noResultsDiv = document.getElementById('no-results');
+      const resultsContainer = document.getElementById('resultsContainer');
+
       noResultsDiv.style.display = 'none';
-      resultsTable.style.display = 'none';
-      resultsBody.innerHTML = '';
+      resultsContainer.style.display = 'none';
+      resultsContainer.classList.remove('two-columns');
+      resultsContainer.innerHTML = '';
 
       if (!dt) {
         noResultsDiv.innerText = "Please select a date and time.";
@@ -246,21 +269,21 @@
         const data = await response.json();
 
         if (data.open_restaurants && data.open_restaurants.length > 0) {
-          // Populate table
-          data.open_restaurants.forEach(r => {
-            const row = document.createElement('tr');
-            const cell = document.createElement('td');
-            cell.textContent = r;
-            row.appendChild(cell);
-            resultsBody.appendChild(row);
+          data.open_restaurants.forEach((r) => {
+            const card = document.createElement('div');
+            card.classList.add('restaurant-card');
+            card.textContent = r;
+            resultsContainer.appendChild(card);
           });
-          resultsTable.style.display = 'table';
+
+          if (data.open_restaurants.length > 10) {
+            resultsContainer.classList.add('two-columns');
+          }
+          resultsContainer.style.display = 'grid';
         } else if (data.message) {
-          // Show no results message from API
           noResultsDiv.innerText = data.message;
           noResultsDiv.style.display = 'block';
         } else {
-          // If no message, just a generic no-results
           noResultsDiv.innerText = "No restaurants found.";
           noResultsDiv.style.display = 'block';
         }
@@ -272,15 +295,14 @@
     }
 
     function resetFields() {
-      const datetimeInput = document.getElementById('datetimeInput');
+      fp.clear();
       const noResultsDiv = document.getElementById('no-results');
-      const resultsTable = document.getElementById('resultsTable');
-      const resultsBody = document.getElementById('resultsBody');
+      const resultsContainer = document.getElementById('resultsContainer');
 
-      datetimeInput.value = '';
       noResultsDiv.style.display = 'none';
-      resultsTable.style.display = 'none';
-      resultsBody.innerHTML = '';
+      resultsContainer.style.display = 'none';
+      resultsContainer.classList.remove('two-columns');
+      resultsContainer.innerHTML = '';
     }
   </script>
 </body>

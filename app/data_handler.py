@@ -1,8 +1,13 @@
 # data_handler.py
 
-
 import csv
 from datetime import datetime, time
+import re
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 DAYS_MAP = {
     "mon": 0,
@@ -14,66 +19,109 @@ DAYS_MAP = {
     "sun": 6
 }
 
+# Mapping of possible day name variations to standardized abbreviations
+day_aliases = {
+    'mon': 'mon',
+    'monday': 'mon',
+    'tue': 'tue',
+    'tues': 'tue',
+    'tuesday': 'tue',
+    'wed': 'wed',
+    'weds': 'wed',
+    'wednesday': 'wed',
+    'thu': 'thu',
+    'thurs': 'thu',
+    'thursday': 'thu',
+    'fri': 'fri',
+    'friday': 'fri',
+    'sat': 'sat',
+    'saturday': 'sat',
+    'sun': 'sun',
+    'sunday': 'sun',
+}
+
 def parse_time_string(time_str):
-    # Remove extra spaces and convert to lower case
+    """
+    Parses a time string like '1:30 pm' into a datetime.time object.
+    """
     time_str = time_str.strip().lower()
+    match = re.match(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)', time_str)
+    if not match:
+        logger.error(f"Invalid time format: '{time_str}'")
+        raise ValueError(f"Invalid time format: '{time_str}'")
 
-    print(time_str)
-    # Split by space:
-    parts = time_str.split()
-    print(parts)
-    extract_time = parts[0]
-    extract_am_pm = parts[1] if len(parts) > 1 else None
+    hour = int(match.group(1))
+    minute = int(match.group(2)) if match.group(2) else 0
+    period = match.group(3)
 
-    # Check if the time includes minutes, if not assume the minutes are 0
-    if ":" in extract_time:
-        hour_str, minute_str = extract_time.split(":")
-    else:
-        hour_str = extract_time
-        minute_str = "00"
+    if hour < 1 or hour > 12:
+        logger.error(f"Hour must be between 1 and 12 in time string: '{time_str}'")
+        raise ValueError(f"Hour must be between 1 and 12 in time string: '{time_str}'")
 
-    hour = int(hour_str)
-    minute = int(minute_str)
-
-    if extract_am_pm == "pm" and hour != 12:
+    if period == 'pm' and hour != 12:
         hour += 12
-    elif extract_am_pm == "am" and hour == 12:
+    elif period == 'am' and hour == 12:
         hour = 0
 
     return time(hour, minute)
 
 def parse_days(days_str):
-    # days_str could be "Mon-Fri, Sat" -> split by ',' first -> ["Mon-Fri", " Sat"]
-    # Then strip spaces and handle each range
+    """
+    Parses a string of days into a list of standardized three-letter abbreviations.
+    Handles individual days and ranges, accounting for different abbreviations.
+    """
     final_days = []
 
-    # if there's a comma, split the string so the days are separated
+    # Split by commas first
     parts = [d.strip() for d in days_str.split(',')]
     for part in parts:
         if '-' in part:
-            # range like "Mon-Fri"
-            start_day, end_day = [p.strip().lower() for p in part.split('-')]
-            # Map them to numeric or just keep them in a list
-            # We'll do a helper to expand day ranges:
-            final_days.extend(expand_day_range(start_day, end_day))
+            # Address the range like "Mon-Fri"
+            start_day_raw, end_day_raw = [p.strip().lower() for p in part.split('-')]
+            # Normalize day names
+            start_day = day_aliases.get(start_day_raw)
+            end_day = day_aliases.get(end_day_raw)
+            if not start_day or not end_day:
+                logger.error(f"Invalid day name in range: '{part}'")
+                raise ValueError(f"Invalid day name in range: '{part}'")
+            # Expand the day range
+            expanded_days = expand_day_range(start_day, end_day)
+            final_days.extend(expanded_days)
         else:
-            # single day
-            final_days.append(part.lower())
+            # Single day
+            day_raw = part.lower()
+            day = day_aliases.get(day_raw)
+            if not day:
+                logger.error(f"Invalid day name: '{part}'")
+                raise ValueError(f"Invalid day name: '{part}'")
+            final_days.append(day)
+
     return final_days
 
 def expand_day_range(start, end):
-    # Using DAYS_MAP, we can find the numeric day, then add until we reach end.
-    inv_map = {v:k for k,v in DAYS_MAP.items()}
-    start_idx = DAYS_MAP[start[:3]]  # just take first three letters for mapping
-    end_idx = DAYS_MAP[end[:3]]
+    """
+    Expands a range of days into a list of standardized day abbreviations.
+    """
+    inv_map = {v: k for k, v in DAYS_MAP.items()}
+    start_idx = DAYS_MAP.get(start[:3])
+    end_idx = DAYS_MAP.get(end[:3])
 
-    # If start to end wraps, handle that. Usually it won't if well-formed.
-    # For simplicity assume start <= end
-    return [inv_map[i] for i in range(start_idx, end_idx+1)]
+    if start_idx is None or end_idx is None:
+        logger.error(f"Invalid day names in range: '{start}-{end}'")
+        raise ValueError(f"Invalid day names in range: '{start}-{end}'")
 
+    if start_idx <= end_idx:
+        days = [inv_map[i] for i in range(start_idx, end_idx + 1)]
+    else:
+        # Wrap around the week
+        days = [inv_map[i] for i in range(start_idx, 7)] + [inv_map[i] for i in range(0, end_idx + 1)]
+    return days
 
 def parse_hours(hours_str):
-    segments = [seg.strip() for seg in hours_str.split('/')]
+    """
+    Parses a restaurant's operating hours string into a schedule dictionary.
+    """
+    segments = [seg.strip() for seg in hours_str.split('/') if seg.strip()]
     schedule = {d: [] for d in DAYS_MAP.keys()}  # mon,tue,wed...
 
     for segment in segments:
@@ -84,7 +132,7 @@ def parse_hours(hours_str):
         for i, part in enumerate(words):
             p = part.lower()
             if "am" in p or "pm" in p:
-                # Check if the previous word is part of the time
+                # Check if the time includes the previous word
                 if i > 0 and (any(char.isdigit() for char in words[i-1]) or ':' in words[i-1]):
                     time_index = i - 1
                 else:
@@ -92,32 +140,36 @@ def parse_hours(hours_str):
                 break
 
         if time_index is None:
+            logger.warning(f"No time found in segment: '{segment}'")
             continue
 
         days_part = " ".join(words[:time_index])
         time_part = " ".join(words[time_index:])
 
-        days_list = parse_days(days_part)
-        start_str, end_str = [t.strip() for t in time_part.split('-')]
+        try:
+            days_list = parse_days(days_part)
+        except ValueError as ve:
+            logger.error(f"Error parsing days in segment '{segment}': {ve}")
+            continue
 
-        start_time = parse_time_string(start_str)
-        end_time = parse_time_string(end_str)
+        try:
+            start_str, end_str = [t.strip() for t in time_part.split('-')]
+        except ValueError:
+            logger.error(f"Invalid time range in segment: '{segment}'")
+            continue
+
+        try:
+            start_time = parse_time_string(start_str)
+            end_time = parse_time_string(end_str)
+        except ValueError as ve:
+            logger.error(f"Error parsing time in segment '{segment}': {ve}")
+            continue
 
         # Check if end_time is actually on the next day (end_time < start_time)
         if end_time < start_time:
             # The hours roll over past midnight.
             # Interval 1: from start_time until end of day
             # Interval 2: from midnight to end_time on the NEXT day
-            #
-            # Example:
-            # Fri 23:00 - 01:00 (Sat)
-            # Fri: (23:00 - 23:59:59)
-            # Sat: (00:00 - 01:00)
-            #
-            # For simplicity, we assume "end of day" as 23:59.
-            # Alternatively, you can store times as (start, end, next_day_flag) or just to midnight directly.
-
-            # Define a helper time: midnight and end of day
             midnight = time(0, 0)
             end_of_day = time(23, 59)
 
@@ -126,14 +178,13 @@ def parse_hours(hours_str):
                 schedule[d].append((start_time, end_of_day))
 
                 # Now find the next day (wrap around if needed)
-                current_day_idx = DAYS_MAP[d[:3]]
+                current_day_idx = DAYS_MAP[d]
                 next_day_idx = (current_day_idx + 1) % 7
                 inv_map = {v: k for k, v in DAYS_MAP.items()}
                 next_day = inv_map[next_day_idx]
 
                 # Interval from midnight to end_time for the next day
                 schedule[next_day].append((midnight, end_time))
-
         else:
             # Normal case: within the same day
             for d in days_list:
@@ -141,16 +192,25 @@ def parse_hours(hours_str):
 
     return schedule
 
-
-
 def load_data(csv_path="data/restaurants.csv"):
+    """
+    Loads restaurant data from a CSV file.
+    """
     restaurants = {}
-    with open(csv_path, 'r') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            name = row["Restaurant Name"].strip('"')
-            hours = row["Hours"]
-            # parse the hours
-            schedule = parse_hours(hours)
-            restaurants[name] = schedule
+    try:
+        with open(csv_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                name = row["Restaurant Name"].strip('"').strip()
+                hours = row["Hours"].strip()
+                # Parse the hours
+                try:
+                    schedule = parse_hours(hours)
+                    restaurants[name] = schedule
+                except ValueError as ve:
+                    logger.error(f"Error parsing hours for restaurant '{name}': {ve}")
+    except FileNotFoundError:
+        logger.error(f"CSV file not found at path: '{csv_path}'")
+    except Exception as e:
+        logger.error(f"Unexpected error loading data: {e}")
     return restaurants
