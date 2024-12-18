@@ -7,12 +7,14 @@ This application provides a FastAPI-based backend that parses a CSV of restauran
 
 ![Screenshot of Open Bites](https://res.cloudinary.com/dm7y3yvjp/image/upload/v1734325621/Screenshot_2024-12-15_at_9.06.40_PM_mqfua6.png)
 
+This application provides a FastAPI-based backend that utilizes SQLite for data storage, parses a CSV of restaurant hours, and offers a frontend interface with a date/time picker for easy queries. The project demonstrates parsing complex schedules, integrating a frontend served by FastAPI, containerization with Docker, and a responsive UI.
+
 ---
 
 ## Features
 
 - **User-Friendly UI:** Select a date and time using a modern date/time picker.
-- **Automated Parsing:** The backend parses restaurant schedules from a CSV file.
+- **SQLite Integration:** Efficiently store and query restaurant data using SQLite.
 - **On-the-Fly Filtering:** The endpoint returns only those restaurants open at the requested time.
 - **Scalable & Extensible:** Easily add new restaurants to the CSV, change parsing logic, or integrate further features.
 - **Easy Testing:** Includes a test suite with `pytest` to ensure parsing and endpoint logic remains robust.
@@ -25,6 +27,7 @@ This application provides a FastAPI-based backend that parses a CSV of restauran
 
 - **Python 3.10+** recommended
 - **pip** for installing dependencies
+- **SQLite** (installed by default with Python's standard library)
 - **Docker** (optional) if you want to run in a containerized environment
 
 ### Cloning the Repository
