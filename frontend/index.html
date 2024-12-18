@@ -265,7 +265,7 @@
       }
 
       try {
-        const response = await fetch(`http://127.0.0.1:8000/open_restaurants/?datetime_str=${encodeURIComponent(dt)}`);
+        const response = await fetch(`https://open-bites.ryangriego.com/open_restaurants/?datetime_str=${encodeURIComponent(dt)}`);
         const data = await response.json();
 
         if (data.open_restaurants && data.open_restaurants.length > 0) {
