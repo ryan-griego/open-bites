@@ -89,7 +89,6 @@ def test_load_data():
 # Tests to make sure load_data can load data from the SQLite database
 
 def test_load_data_sqlite():
-    # Assuming 'app/restaurants.db' exists and contains valid data
     restaurants = load_data("app/restaurants.db")
     assert isinstance(restaurants, dict), "Restaurants should be a dictionary"
     assert len(restaurants) > 0, "Restaurants dictionary should not be empty"
