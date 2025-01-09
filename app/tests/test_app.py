@@ -85,6 +85,26 @@ def test_load_data():
                 assert isinstance(start, time), "Start time should be a datetime.time object"
                 assert isinstance(end, time), "End time should be a datetime.time object"
 
+
+# Tests to make sure load_data can load data from the SQLite database
+
+def test_load_data_sqlite():
+    # Assuming 'app/restaurants.db' exists and contains valid data
+    restaurants = load_data("app/restaurants.db")
+    assert isinstance(restaurants, dict), "Restaurants should be a dictionary"
+    assert len(restaurants) > 0, "Restaurants dictionary should not be empty"
+
+    for name, schedule in restaurants.items():
+        assert isinstance(name, str), f"Restaurant name '{name}' should be a string"
+        assert isinstance(schedule, dict), f"Schedule for '{name}' should be a dictionary"
+
+        for day, times in schedule.items():
+            assert isinstance(day, str), f"Day '{day}' in '{name}' should be a string"
+            assert isinstance(times, list), f"Times for '{day}' in '{name}' should be a list"
+            for start, end in times:
+                assert isinstance(start, time), "Start time should be a datetime.time object"
+                assert isinstance(end, time), "End time should be a datetime.time object"
+
 def test_parse_hours_non_sequential_days():
     # Non-sequential days: "Mon, Wed, Fri 11 am - 2 pm"
     hours_str = "Mon, Wed, Fri 11 am - 2 pm"
